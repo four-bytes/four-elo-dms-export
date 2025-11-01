@@ -86,7 +86,7 @@ class Logger
      */
     public static function createWithLogFile(string $basePath, string $name = 'export'): self
     {
-        $logDir = rtrim($basePath, '/') . '/logs';
+        $logDir = rtrim($basePath, '/');
 
         if (!is_dir($logDir)) {
             mkdir($logDir, 0755, true);

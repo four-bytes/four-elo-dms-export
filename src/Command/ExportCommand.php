@@ -77,12 +77,15 @@ class ExportCommand extends Command
         ]);
 
         try {
-            // Initialize logger
-            $logger = Logger::createWithLogFile($outputPath);
+            // Initialize logger (write to project var/log directory)
+            $projectRoot = dirname(__DIR__, 2);
+            $logPath = $projectRoot . '/var/log';
+            $logger = Logger::createWithLogFile($logPath);
             $logger->info('=== ELO DMS Export Started ===');
             $logger->info('Database: ' . $databasePath);
             $logger->info('Files Path: ' . $filesPath);
             $logger->info('Output Path: ' . $outputPath);
+            $logger->info('Log Path: ' . $logPath);
 
             // Initialize services
             $io->section('Initializing services...');
@@ -91,18 +94,19 @@ class ExportCommand extends Command
             $organizer = new ExportOrganizer($outputPath);
             $logger->info('Services initialized successfully');
 
-            // Read database
+            // Read database (get count first for progress bar)
             $io->section('Reading ELO database...');
-            $documents = $dbReader->getDocuments();
-            $io->success(sprintf('Found %d documents in database', count($documents)));
-            $logger->info('Found ' . count($documents) . ' documents in database');
+            $documentCount = $dbReader->getDocumentCount();
+            $io->success(sprintf('Found %d documents in database', $documentCount));
+            $logger->info('Found ' . $documentCount . ' documents in database');
 
             // Initialize output directory
             $organizer->initialize();
 
-            // Process documents
+            // Process documents (streaming)
             $io->section('Processing documents...');
-            $io->progressStart(count($documents));
+            $io->progressStart($documentCount);
+            $documents = $dbReader->getDocuments();
 
             $processed = 0;
             $skipped = 0;
@@ -157,7 +161,7 @@ class ExportCommand extends Command
                     $targetPath = $organizer->addDocument($document, $pdfPath);
                     $logger->info('Processed document', [
                         'objid' => $document['objid'] ?? 'unknown',
-                        'source' => $filename,
+                        'source' => basename($sourcePath),
                         'target' => basename($targetPath)
                     ]);
 
@@ -183,18 +187,6 @@ class ExportCommand extends Command
 
             $io->progressFinish();
 
-            // Export metadata
-            $io->section('Exporting metadata...');
-            $organizer->exportMetadata($organizer->getProcessedDocuments());
-
-            // Export summary report
-            $organizer->exportSummary([
-                'total_found' => count($documents),
-                'processed' => $processed,
-                'skipped' => $skipped,
-                'errors' => count($errors),
-            ]);
-
             // Summary
             $io->section('Export Summary');
             $io->success(sprintf('Successfully processed %d documents', $processed));
@@ -212,7 +204,7 @@ class ExportCommand extends Command
             }
 
             $logger->info('=== Export Summary ===');
-            $logger->info("Total documents: " . count($documents));
+            $logger->info("Total documents: " . $documentCount);
             $logger->info("Processed: {$processed}");
             $logger->info("Skipped: {$skipped}");
             $logger->info("Errors: " . count($errors));

@@ -67,43 +67,51 @@ class DatabaseReader
     }
 
     /**
-     * Get documents from ELO database
+     * Get total count of documents to be exported
+     *
+     * @return int
+     */
+    public function getDocumentCount(): int
+    {
+        // Count active files (objstatus = 0)
+        $sql = "SELECT COUNT(*) as cnt FROM objekte WHERE objtype > 254 AND objstatus = 0";
+        $stmt = $this->connection->query($sql);
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        return (int)($result['cnt'] ?? 0);
+    }
+
+    /**
+     * Get documents from ELO database as a generator (streaming)
      *
      * Returns all file objects (objtype > 254) that are not deleted (objstatus != 1)
      *
-     * @return array<array<string, mixed>>
+     * @return \Generator
      */
-    public function getDocuments(): array
+    public function getDocuments(): \Generator
     {
-        // 1. Load all objekte entries
-        $sql = "SELECT * FROM objekte";
+        // 1. Load only folders (objtype < 255, active objstatus = 0)
+        $sql = "SELECT * FROM objekte WHERE objtype < 255 AND objstatus = 0";
         $stmt = $this->connection->query($sql);
-        $documents = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $folders = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        // 2. Build folder path lookup for folders (objtype < 255)
-        $folderPaths = $this->buildFolderPathLookup($documents);
+        // 2. Build folder path lookup from folders only
+        $folderPaths = $this->buildFolderPathLookup($folders);
 
-        // 3. Process file entries (objtype > 254)
-        $result = [];
-        foreach ($documents as $doc) {
-            // Only include files (objtype > 254)
-            if (!isset($doc['objtype']) || $doc['objtype'] < 255) {
-                continue;
-            }
+        // Free folders from memory
+        unset($folders);
 
-            // Skip deleted documents (objstatus = 1)
-            if (isset($doc['objstatus']) && $doc['objstatus'] == 1) {
-                continue;
-            }
+        // 3. Stream file entries (objtype > 254, active objstatus = 0)
+        $sql = "SELECT * FROM objekte WHERE objtype > 254 AND objstatus = 0";
+        $stmt = $this->connection->query($sql);
 
+        // 4. Yield files one at a time with folder paths
+        while ($doc = $stmt->fetch(PDO::FETCH_ASSOC)) {
             // Add folder path using objparent to lookup folder path
             $objparent = isset($doc['objparent']) ? (int)$doc['objparent'] : 0;
             $doc['folder_path'] = $folderPaths[$objparent] ?? '';
 
-            $result[] = $doc;
+            yield $doc;
         }
-
-        return $result;
     }
 
     /**

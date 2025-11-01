@@ -13,7 +13,6 @@ class ExportOrganizer
 {
     private Filesystem $filesystem;
     private string $outputPath;
-    private array $processedDocuments = [];
 
     public function __construct(string $outputPath)
     {
@@ -26,10 +25,10 @@ class ExportOrganizer
      */
     public function initialize(): void
     {
+        // Create output directory for documents only
         $this->filesystem->mkdir([
             $this->outputPath,
             $this->outputPath . '/documents',
-            $this->outputPath . '/metadata',
         ]);
     }
 
@@ -67,64 +66,9 @@ class ExportOrganizer
         // Copy PDF to target location
         $this->filesystem->copy($pdfPath, $targetPath);
 
-        // Track processed document
-        $this->processedDocuments[] = array_merge($metadata, [
-            'export_path' => $targetPath,
-            'export_date' => date('Y-m-d H:i:s'),
-        ]);
-
         return $targetPath;
     }
 
-    /**
-     * Export metadata to CSV file
-     *
-     * @param array<array<string, mixed>> $documents All documents metadata
-     */
-    public function exportMetadata(array $documents): void
-    {
-        if (empty($documents)) {
-            return;
-        }
-
-        $csvPath = $this->outputPath . '/metadata/documents.csv';
-
-        $fp = fopen($csvPath, 'w');
-        if ($fp === false) {
-            throw new \RuntimeException("Failed to create CSV file: {$csvPath}");
-        }
-
-        // Write header
-        $headers = array_keys($documents[0]);
-        fputcsv($fp, $headers);
-
-        // Write data
-        foreach ($documents as $document) {
-            fputcsv($fp, $document);
-        }
-
-        fclose($fp);
-    }
-
-    /**
-     * Export summary JSON
-     */
-    public function exportSummary(array $stats): void
-    {
-        $summaryPath = $this->outputPath . '/metadata/export-report.json';
-
-        $summary = [
-            'export_date' => date('c'),
-            'total_documents' => count($this->processedDocuments),
-            'statistics' => $stats,
-            'documents' => $this->processedDocuments,
-        ];
-
-        $this->filesystem->dumpFile(
-            $summaryPath,
-            json_encode($summary, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)
-        );
-    }
 
     /**
      * Sanitize filename according to ELO export rules
@@ -176,13 +120,5 @@ class ExportOrganizer
         }
 
         return null;
-    }
-
-    /**
-     * Get processed documents
-     */
-    public function getProcessedDocuments(): array
-    {
-        return $this->processedDocuments;
     }
 }

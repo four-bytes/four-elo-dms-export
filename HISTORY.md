@@ -1,5 +1,29 @@
 # four-elo-dms-export - Change History
 
+## [0.3.0] - 2025-11-01
+
+### Changed
+- **Streaming architecture**: Converted getDocuments() to use PHP generator for memory-efficient processing
+- **Partial database reading**: Separated folder loading from file loading to reduce memory footprint
+- **Optimized queries**: Added WHERE clauses to filter at database level
+- **Logs relocated**: Moved all logs to var/log relative to tool (not in export path)
+- **Clean export structure**: Export folder now contains only documents/ hierarchy, no metadata files
+
+### Removed
+- Metadata export functionality (CSV and JSON reports)
+- processedDocuments tracking (no longer needed)
+
+### Fixed
+- Undefined $filename variable in logging
+
+### Technical Details
+- getDocuments() now yields documents one at a time instead of loading all into memory
+- Added getDocumentCount() for efficient progress bar counting
+- Folder hierarchy built first from `SELECT * FROM objekte WHERE objtype < 255`
+- Files streamed from `SELECT * FROM objekte WHERE objtype > 254 AND (objstatus IS NULL OR objstatus != 1)`
+- Log path: `{project_root}/var/log/`
+- Export path: `{user_specified}/documents/`
+
 ## [0.2.0] - 2025-11-01
 
 ### Fixed
