@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Four\Elo\Command;
 
+use Exception;
 use Four\Elo\Service\DatabaseReader;
 use Four\Elo\Service\ExportOrganizer;
 use Four\Elo\Service\ImageConverter;
@@ -38,42 +39,39 @@ class ExportCommand extends Command
                 InputOption::VALUE_REQUIRED,
                 'Output directory for export',
                 './nextcloud-export'
-            )
-            ->addOption(
-                'dsn',
-                null,
-                InputOption::VALUE_REQUIRED,
-                'Custom ODBC DSN for database connection',
-                null
             );
     }
 
+    /**
+     * @param InputInterface $input
+     * @param OutputInterface $output
+     * @return int
+     */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $io = new SymfonyStyle($input, $output);
         $io->title('ELO DMS Export Tool');
 
         $databasePath = $input->getArgument('database');
-        $filesPath = $input->getArgument('files');
-        $outputPath = $input->getOption('output');
-        $customDsn = $input->getOption('dsn');
+        $filesPath = $input->getArgument('files') ?? 'Archivdata';
+        $outputPath = $input->getOption('output') ?? './Export';
 
         // Validate inputs
         if (!file_exists($databasePath)) {
-            $io->error("Database file not found: {$databasePath}");
+            $io->error("Database file not found: $databasePath");
             return Command::FAILURE;
         }
 
         if (!is_dir($filesPath)) {
-            $io->error("Files directory not found: {$filesPath}");
+            $io->error("Files directory not found: $filesPath");
             return Command::FAILURE;
         }
 
         $io->section('Configuration');
         $io->listing([
-            "Database: {$databasePath}",
-            "Files: {$filesPath}",
-            "Output: {$outputPath}",
+            "Database: $databasePath",
+            "Files: $filesPath",
+            "Output: $outputPath",
         ]);
 
         try {
@@ -89,7 +87,7 @@ class ExportCommand extends Command
 
             // Initialize services
             $io->section('Initializing services...');
-            $dbReader = new DatabaseReader($databasePath, $customDsn);
+            $dbReader = new DatabaseReader($databasePath);
             $imageConverter = new ImageConverter();
             $organizer = new ExportOrganizer($outputPath);
             $logger->info('Services initialized successfully');
@@ -111,30 +109,27 @@ class ExportCommand extends Command
             $processed = 0;
             $skipped = 0;
             $errors = [];
-
             foreach ($documents as $document) {
                 try {
                     // Get objdoc (required)
-                    $objdoc = $document['objdoc'] ?? null;
-
-                    if (!$objdoc) {
+                    if (!($document->objdoc ?? null)) {
                         $skipped++;
-                        $logger->debug('Skipped document without objdoc', ['objid' => $document['objid'] ?? 'unknown']);
+                        $logger->debug('Skipped document without objdoc', ['objid' => $document->objid ?? 'unknown']);
                         $io->progressAdvance();
                         continue;
                     }
 
                     // Build file path pattern without extension (objdoc as hex filename)
-                    $filePathPattern = $filesPath . '/' . $dbReader->buildFilePathFromObjdoc($objdoc, '');
+                    $filePathPattern = $dbReader->buildFilePath($document, $filesPath) . '.*';
 
                     // Glob for file with any extension
-                    $possibleFiles = glob($filePathPattern . '.*', GLOB_NOSORT);
+                    $possibleFiles = glob($filePathPattern, GLOB_NOSORT);
 
                     if (empty($possibleFiles)) {
-                        $error = sprintf('File not found for objdoc: %s (hex: %s, objid: %s)',
-                            $objdoc,
-                            $dbReader->objdocToHexFilename($objdoc),
-                            $document['objid'] ?? 'unknown'
+                        $error = sprintf('File not found for objdoc: %s (Pattern: %s, objid: %s)',
+                            $document->objdoc ?? 'unknown',
+                            $filePathPattern,
+                            $document->objid ?? 'unknown'
                         );
                         $errors[] = $error;
                         $logger->warning($error);
@@ -155,27 +150,23 @@ class ExportCommand extends Command
 
                     // Convert to PDF
                     $logger->debug('Converting to PDF', ['source' => $sourcePath]);
-                    $pdfPath = $imageConverter->convertToPdf($sourcePath);
+                    $pdfContent = $imageConverter->convertToPdf($sourcePath);
 
                     // Add to export with proper organization
-                    $targetPath = $organizer->addDocument($document, $pdfPath);
+                    $pdfRelativePath =  $dbReader->createDocumentPath($document) . '.pdf';
+                    $targetPath = $organizer->addDocument($document, $pdfRelativePath, $pdfContent);
                     $logger->info('Processed document', [
-                        'objid' => $document['objid'] ?? 'unknown',
+                        'objid' => $document->objid ?? 'unknown',
                         'source' => basename($sourcePath),
                         'target' => basename($targetPath)
                     ]);
 
-                    // Clean up temp PDF
-                    if (file_exists($pdfPath)) {
-                        @unlink($pdfPath);
-                    }
-
                     $processed++;
-                } catch (\Exception $e) {
+                } catch (Exception $e) {
                     $error = sprintf(
                         'Document %s (objid: %s): %s',
-                        $document['objshort'] ?? 'unknown',
-                        $document['objid'] ?? 'unknown',
+                        $document->objshort ?? 'unknown',
+                        $document->objid ?? 'unknown',
                         $e->getMessage()
                     );
                     $errors[] = $error;
@@ -210,12 +201,12 @@ class ExportCommand extends Command
             $logger->info("Errors: " . count($errors));
             $logger->info("Log file: " . $logger->getLogFile());
 
-            $io->success("Export completed! Output: {$outputPath}");
+            $io->success("Export completed! Output: $outputPath");
             $io->info("Log file: " . $logger->getLogFile());
 
             return Command::SUCCESS;
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             if (isset($logger)) {
                 $logger->error('Export failed: ' . $e->getMessage());
                 $logger->error('Stack trace: ' . $e->getTraceAsString());

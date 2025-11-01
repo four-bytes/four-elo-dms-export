@@ -5,7 +5,7 @@
 
 ### Overview
 This tool exports documents from an ELO DMS archive by:
-1. Reading metadata from the MDB database
+1. Reading metadata from the MDB database using mdb-json
 2. Building folder hierarchy from folder objects
 3. Converting image files (TIF/JPG) to PDF
 4. Organizing exported files in ELO folder structure
@@ -13,20 +13,23 @@ This tool exports documents from an ELO DMS archive by:
 ### Step-by-Step Process
 
 1. **Load all objects from database**
-   - Query: `SELECT * FROM objekte`
-   - Loads both folders (objtype < 255) and files (objtype > 254)
+   - Uses: `mdb-json {database} objekte` (outputs one JSON object per line)
+   - Streams data line-by-line for memory efficiency
+   - Processes both folders (objtype < 255) and files (objtype > 254)
 
 2. **Build folder path lookup**
-   - Process folders only (objtype < 255)
+   - Process folders only (objtype < 255) where objstatus = 0 (active)
    - For each folder, traverse `objparent` chain to root
    - Creates lookup: `[objid] => "path/to/folder"`
    - Folder names are sanitized `objshort` values
 
 3. **Process file objects**
-   - Filter files (objtype > 254) where objstatus != 1
+   - Filter files (objtype > 254) where objstatus = 0 (active)
    - For each file:
      - Convert `objdoc` (decimal) to hex filename (e.g., 3101 → "00000C1D")
-     - Build file path: `Archivdata/DMS_1/UP{first6}/{hexFilename}.*`
+     - Calculate folder: `objdoc >> 10` (divide by 1024), convert to 6-char hex
+     - Build file path: `Archivdata/DMS_1/UP{folder_hex}/{hexFilename}.*`
+     - Example: objdoc=3101 → folder=3>>10=3=000003 → `Archivdata/DMS_1/UP000003/00000C1D.*`
      - Use glob to find file with any extension (.TIF, .JPG, etc.)
      - Get folder path using `objparent` from folder lookup
      - Convert TIF/JPG to PDF
@@ -36,7 +39,7 @@ This tool exports documents from an ELO DMS archive by:
 
 ### Database Location
 - **Path**: `Archivdata/DMS.MDB`
-- **Driver**: MDBTools ODBC (Linux) or MS Access ODBC (Windows)
+- **Access Method**: mdb-json from MDBTools package (outputs line-delimited JSON)
 
 ### Table: objekte
 Main table containing all ELO objects (folders and files)
@@ -82,14 +85,30 @@ docmd5, docguid, doctstamp, docflags, docstatus, docsignature
 ## File Storage Structure
 
 ### Physical File Location
-Files are stored in a two-level directory structure based on filename:
+Files are stored in a two-level directory structure based on objdoc calculation:
 
-**Pattern**: `Archivdata/DMS_1/UP{first6chars}/{filename}`
+**Pattern**: `Archivdata/DMS_1/UP{folder_hex}/{filename}`
+
+**Folder Calculation**:
+- Take objdoc value (decimal)
+- Divide by 1024 using bitwise right shift: `objdoc >> 10`
+- Convert result to 6-character uppercase hex
+- Prefix with "UP"
 
 **Example**:
-- Filename: `00000C1D.TIF`
-- Folder: `UP` + first 6 chars = `UP00000C`
-- Full path: `Archivdata/DMS_1/UP00000C/00000C1D.TIF`
+- objdoc: 3101 (decimal)
+- Folder calculation: 3101 >> 10 = 3
+- Folder hex: 000003 (6 chars)
+- Folder name: UP000003
+- Filename: 00000C1D.TIF (objdoc 3101 in 8-char hex)
+- Full path: `Archivdata/DMS_1/UP000003/00000C1D.TIF`
+
+**More Examples**:
+| objdoc | objdoc >> 10 | Folder Hex | Folder Name | Filename    |
+|--------|--------------|------------|-------------|-------------|
+| 3101   | 3            | 000003     | UP000003    | 00000C1D    |
+| 18000  | 17           | 000011     | UP000011    | 00004650    |
+| 115000 | 112          | 000070     | UP000070    | 0001C138    |
 
 ## Filename Sanitization Rules
 
@@ -114,7 +133,7 @@ objekte:
 
 **Export result**:
 ```
-Export/documents/Invoices/2024/INV-001.pdf
+Export/Invoices/2024/INV-001.pdf
 ```
 
 **Process**:
@@ -122,10 +141,11 @@ Export/documents/Invoices/2024/INV-001.pdf
 2. File objid=300 has objparent=200, objdoc="3101"
 3. Get folder path from objparent=200: "Invoices/2024"
 4. Convert objdoc to hex: 3101 (decimal) → "00000C1D" (hex, 8 chars)
-5. Build file path: `Archivdata/DMS_1/UP00000C/00000C1D.*`
-6. Glob finds: `Archivdata/DMS_1/UP00000C/00000C1D.TIF`
-7. Convert TIF → PDF
-8. Save as: "Export/documents/Invoices/2024/INV-001.pdf"
+5. Calculate folder: 3101 >> 10 = 3 → "000003" (hex, 6 chars) → "UP000003"
+6. Build file path: `Archivdata/DMS_1/UP000003/00000C1D.*`
+7. Glob finds: `Archivdata/DMS_1/UP000003/00000C1D.TIF`
+8. Convert TIF → PDF
+9. Save as: "Export/Invoices/2024/INV-001.pdf"
 
 ## Filename Conversion
 

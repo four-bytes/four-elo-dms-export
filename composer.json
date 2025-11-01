@@ -3,7 +3,7 @@
     "description": "CLI tool for exporting ELO DMS archives to Nextcloud-ready folder structures",
     "type": "library",
     "license": "MIT",
-    "version": "0.3.0",
+    "version": "0.5.0",
     "authors": [
         {
             "name": "4 Bytes",
@@ -12,7 +12,6 @@
     ],
     "require": {
         "php": ">=8.1",
-        "ext-pdo": "*",
         "ext-imagick": "*",
         "symfony/console": "^7.0",
         "symfony/filesystem": "^7.0"

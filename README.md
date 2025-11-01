@@ -16,11 +16,9 @@ A PHP CLI tool for exporting ELO DMS archives to Nextcloud-ready folder structur
 
 - PHP 8.1 or higher
 - PHP Extensions:
-  - `pdo_odbc` - For MDB database access
   - `imagick` - For image to PDF conversion
 - System packages:
-  - `unixODBC`
-  - `mdbtools-odbc` (Linux) or Microsoft Access ODBC Driver (Windows)
+  - `mdbtools` - For MDB database access (provides mdb-json command)
 
 ## Installation
 
@@ -37,63 +35,45 @@ composer install
 
 #### Linux / WSL 2 (Ubuntu/Debian)
 
-Install UnixODBC and MDBTools for MDB database access:
+Install MDBTools and PHP Imagick:
 
 ```bash
-# Install ODBC and MDBTools
+# Install MDBTools for MDB database access
 sudo apt-get update
-sudo apt-get install -y unixodbc unixodbc-dev mdbtools mdbtools-dev
+sudo apt-get install -y mdbtools
 
-# Install PHP extensions
-sudo apt-get install -y php-odbc
+# Install PHP Imagick extension
+sudo apt-get install -y php-imagick imagemagick
 
-# Verify installation
-php -m | grep -i odbc
-php -m | grep -i pdo
-```
+# Verify MDBTools installation
+mdb-json --version
 
-Configure MDBTools ODBC driver:
-
-```bash
-# Edit ODBC configuration
-sudo nano /etc/odbcinst.ini
-```
-
-Add this configuration:
-
-```ini
-[MDBTools]
-Description = MDBTools ODBC Driver
-Driver = /usr/lib/x86_64-linux-gnu/odbc/libmdbodbc.so
-Setup = /usr/lib/x86_64-linux-gnu/odbc/libmdbodbc.so
-FileUsage = 1
-```
-
-Test ODBC connection:
-
-```bash
-# Check available drivers
-odbcinst -q -d
-
-# Test connection to MDB file
-isql -v "Driver=MDBTools;DBQ=/path/to/file.mdb"
+# Verify Imagick installation
+php -m | grep imagick
 ```
 
 #### Windows
 
-For Windows, install the Microsoft Access Database Engine:
+Install MDBTools and Imagick:
 
-1. Download [Microsoft Access Database Engine 2016 Redistributable](https://www.microsoft.com/en-us/download/details.aspx?id=54920)
-2. Install the appropriate version (32-bit or 64-bit matching your PHP installation)
-3. PHP ODBC extension should be available by default
+1. **MDBTools**: Download from [MDBTools releases](https://github.com/mdbtools/mdbtools/releases) or use package manager
+2. **Imagick**: Download [ImageMagick](https://imagemagick.org/script/download.php#windows) and PHP Imagick extension for your PHP version
 
-#### Install PHP Imagick Extension
+#### macOS
 
 ```bash
-# Linux / WSL 2
-sudo apt-get install -y php-imagick imagemagick
+# Install using Homebrew
+brew install mdbtools imagemagick
+brew install php-imagick
+```
 
-# Verify installation
+#### Verify Installation
+
+```bash
+# Test MDBTools
+mdb-json --help
+
+# Test Imagick
 php -m | grep imagick
 ```
 
@@ -113,7 +93,6 @@ Basic export command:
 ### Options
 
 - `--output` / `-o` - Output directory for export (default: `./nextcloud-export`)
-- `--dsn` - Custom ODBC DSN for database connection (optional)
 
 ### Example
 
@@ -152,10 +131,11 @@ The tool works with standard ELO DMS database structure:
 
 ### Key Fields
 
-- Files are identified by `objtype > 255`
-- Deleted documents have `objstatus = 1` (excluded from export)
-- Filename stored in `objkeys.okeydata` where `okeyname = 'ELO_FNAME'`
-- File path format: `Archivdata/DMS_1/UP{first6chars}/{filename}`
+- Files are identified by `objtype > 254`
+- Deleted documents have `objstatus != 0` (excluded from export)
+- Folder hierarchy built from `objparent` references
+- File path format: `Archivdata/DMS_1/UP{objdoc>>10 in 6-char hex}/{objdoc in 8-char hex}`
+- Example: objdoc=3101 → `Archivdata/DMS_1/UP000003/00000C1D.TIF`
 
 ## Development
 
