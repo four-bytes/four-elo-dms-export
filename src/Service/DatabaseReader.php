@@ -74,16 +74,17 @@ class DatabaseReader
     public function getDocumentCount(): int
     {
         // Count active files (objstatus = 0)
-        $sql = "SELECT COUNT(*) as cnt FROM objekte WHERE objtype > 254 AND objstatus = 0";
+        // MDBTools ODBC is very limited, manually count results
+        $sql = "SELECT objid FROM objekte WHERE objtype > 254 AND objstatus = 0";
         $stmt = $this->connection->query($sql);
-        $result = $stmt->fetch(PDO::FETCH_ASSOC);
-        return (int)($result['cnt'] ?? 0);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        return count($rows);
     }
 
     /**
      * Get documents from ELO database as a generator (streaming)
      *
-     * Returns all file objects (objtype > 254) that are not deleted (objstatus != 1)
+     * Returns all file objects (objtype > 254) that are not deleted (objstatus = 0)
      *
      * @return \Generator
      */

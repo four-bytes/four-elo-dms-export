@@ -25,11 +25,8 @@ class ExportOrganizer
      */
     public function initialize(): void
     {
-        // Create output directory for documents only
-        $this->filesystem->mkdir([
-            $this->outputPath,
-            $this->outputPath . '/documents',
-        ]);
+        // Create output directory
+        $this->filesystem->mkdir($this->outputPath);
     }
 
     /**
@@ -44,8 +41,8 @@ class ExportOrganizer
         $filename = $this->sanitizeFilename($metadata['objshort'] ?? 'document');
         $filename .= '.pdf';
 
-        // Use folder path from ELO hierarchy
-        $targetDir = $this->outputPath . '/documents';
+        // Use folder path from ELO hierarchy directly in output path
+        $targetDir = $this->outputPath;
 
         if (!empty($metadata['folder_path'])) {
             $targetDir .= '/' . $metadata['folder_path'];
