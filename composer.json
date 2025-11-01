@@ -1,0 +1,43 @@
+{
+    "name": "four-bytes/four-elo-dms-export",
+    "description": "CLI tool for exporting ELO DMS archives to Nextcloud-ready folder structures",
+    "type": "library",
+    "license": "MIT",
+    "version": "0.1.0",
+    "authors": [
+        {
+            "name": "4 Bytes",
+            "email": "info@4bytes.de"
+        }
+    ],
+    "require": {
+        "php": ">=8.1",
+        "ext-pdo": "*",
+        "ext-imagick": "*",
+        "symfony/console": "^7.0",
+        "symfony/filesystem": "^7.0"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^10.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Four\\Elo\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Four\\Elo\\Tests\\": "tests/"
+        }
+    },
+    "bin": [
+        "bin/elo-export"
+    ],
+    "config": {
+        "sort-packages": true,
+        "optimize-autoloader": true
+    },
+    "scripts": {
+        "test": "phpunit"
+    }
+}

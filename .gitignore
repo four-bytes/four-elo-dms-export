@@ -1,0 +1,30 @@
+# Composer
+/vendor/
+composer.lock
+
+# PHPUnit
+.phpunit.result.cache
+/phpunit.xml
+
+# IDE
+/.idea/
+/.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Export directories (examples/testing)
+/nextcloud-export/
+/export/
+
+# Logs
+*.log
+/logs/
+
+# Environment
+.env
+.env.local

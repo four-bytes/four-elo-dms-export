@@ -1,0 +1,13 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+require_once __DIR__ . '/../src/bootstrap.php';
+
+use Four\Elo\Command\ExportCommand;
+use Symfony\Component\Console\Application;
+
+$application = new Application('ELO DMS Export Tool', '0.1.0');
+$application->add(new ExportCommand());
+$application->run();
