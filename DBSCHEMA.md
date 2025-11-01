@@ -12,20 +12,22 @@ This tool exports documents from an ELO DMS archive by:
 
 ### Step-by-Step Process
 
-1. **Load objkeys with ELO_FNAME**
-   - Query: `SELECT * FROM objkeys WHERE okeyname = 'ELO_FNAME'`
-   - Creates lookup: `[objid] => filename` (e.g., "00000C1D.TIF")
+1. **Load all objects from database**
+   - Query: `SELECT * FROM objekte`
+   - Loads both folders (objtype < 255) and files (objtype > 254)
 
 2. **Build folder path lookup**
-   - Query: `SELECT * FROM objekte WHERE objtype < 255` (folders only)
+   - Process folders only (objtype < 255)
    - For each folder, traverse `objparent` chain to root
    - Creates lookup: `[objid] => "path/to/folder"`
    - Folder names are sanitized `objshort` values
 
 3. **Process file objects**
-   - Query: `SELECT * FROM objekte WHERE objtype > 254 AND objstatus != 1`
+   - Filter files (objtype > 254) where objstatus != 1
    - For each file:
-     - Get filename from `ELO_FNAME` lookup
+     - Convert `objdoc` (decimal) to hex filename (e.g., 3101 → "00000C1D")
+     - Build file path: `Archivdata/DMS_1/UP{first6}/{hexFilename}.*`
+     - Use glob to find file with any extension (.TIF, .JPG, etc.)
      - Get folder path using `objparent` from folder lookup
      - Convert TIF/JPG to PDF
      - Save as: `Export/<folder_path>/<sanitized_objshort>.pdf`
@@ -59,7 +61,7 @@ objhistcount, objdesc, objchildcount, objdeldate, objsyncdateloc,
 objsyncdaterem, objvtrep, objacl, replset, objguid, objtstamp, objsdata, objsdesc
 
 ### Table: objkeys
-Stores additional metadata key-value pairs for objects
+Stores additional metadata key-value pairs for objects *(not used in basic export)*
 
 **Fields**:
 - `parentid` (int) - References objekte.objid
@@ -68,8 +70,7 @@ Stores additional metadata key-value pairs for objects
 - `okeydata` (text) - Key value
 - `okeysdata` (text) - Additional data
 
-**Important Keys**:
-- `ELO_FNAME` - Contains actual filename with extension (e.g., "00000C1D.TIF")
+**Note**: File extensions are determined via glob pattern matching, so objkeys is not required for basic export
 
 ### Table: dochistory
 Document version history (not used in basic export)
@@ -106,12 +107,9 @@ When exporting, filenames (from `objshort`) are sanitized:
 **Database entries**:
 ```
 objekte:
-  objid=100, objtype=1,   objshort="Invoices", objparent=1     (folder)
-  objid=200, objtype=1,   objshort="2024",     objparent=100   (folder)
-  objid=300, objtype=256, objshort="INV-001",  objparent=200   (file)
-
-objkeys:
-  parentid=300, okeyname="ELO_FNAME", okeydata="00000C1D.TIF"
+  objid=100, objtype=1,   objshort="Invoices", objparent=1        (folder)
+  objid=200, objtype=1,   objshort="2024",     objparent=100      (folder)
+  objid=300, objtype=256, objshort="INV-001",  objparent=200,  objdoc="3101"  (file)
 ```
 
 **Export result**:
@@ -121,9 +119,26 @@ Export/documents/Invoices/2024/INV-001.pdf
 
 **Process**:
 1. Build folder path for objid=200: "Invoices/2024"
-2. File objid=300 has objparent=200
-3. Get folder path: "Invoices/2024"
-4. Get filename: ELO_FNAME = "00000C1D.TIF"
-5. Convert TIF → PDF
-6. Save as: "Export/documents/Invoices/2024/INV-001.pdf"
+2. File objid=300 has objparent=200, objdoc="3101"
+3. Get folder path from objparent=200: "Invoices/2024"
+4. Convert objdoc to hex: 3101 (decimal) → "00000C1D" (hex, 8 chars)
+5. Build file path: `Archivdata/DMS_1/UP00000C/00000C1D.*`
+6. Glob finds: `Archivdata/DMS_1/UP00000C/00000C1D.TIF`
+7. Convert TIF → PDF
+8. Save as: "Export/documents/Invoices/2024/INV-001.pdf"
+
+## Filename Conversion
+
+**objdoc to Hex Filename**:
+- objdoc is stored as decimal integer in database
+- Convert to hexadecimal uppercase
+- Pad with zeros to 8 characters
+
+**Examples**:
+| objdoc (decimal) | Hexadecimal | Padded Filename |
+|-----------------|-------------|-----------------|
+| 10              | A           | 0000000A        |
+| 41              | 29          | 00000029        |
+| 3101            | C1D         | 00000C1D        |
+| 65535           | FFFF        | 0000FFFF        |
 

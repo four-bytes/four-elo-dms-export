@@ -75,18 +75,15 @@ class DatabaseReader
      */
     public function getDocuments(): array
     {
-        // 1. Load all objkeys with ELO_FNAME for lookup
-        $objkeysMap = $this->loadAllObjKeys();
-
-        // 2. Load all objekte entries
+        // 1. Load all objekte entries
         $sql = "SELECT * FROM objekte";
         $stmt = $this->connection->query($sql);
         $documents = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        // 3. Build folder path lookup for folders (objtype < 255)
+        // 2. Build folder path lookup for folders (objtype < 255)
         $folderPaths = $this->buildFolderPathLookup($documents);
 
-        // 4. Process file entries (objtype > 254)
+        // 3. Process file entries (objtype > 254)
         $result = [];
         foreach ($documents as $doc) {
             // Only include files (objtype > 254)
@@ -98,10 +95,6 @@ class DatabaseReader
             if (isset($doc['objstatus']) && $doc['objstatus'] == 1) {
                 continue;
             }
-
-            // Add ELO_FNAME from objkeys map
-            $objid = (int)$doc['objid'];
-            $doc['elo_fname'] = $objkeysMap[$objid]['ELO_FNAME'] ?? null;
 
             // Add folder path using objparent to lookup folder path
             $objparent = isset($doc['objparent']) ? (int)$doc['objparent'] : 0;
@@ -303,22 +296,33 @@ class DatabaseReader
     }
 
     /**
-     * Build file path for ELO document file
-     *
-     * Path format: Archivdata/DMS_1/UP{first6chars}/{filename}
-     * Example: Archivdata/DMS_1/UP00000C/00000C1D.TIF
+     * Convert objdoc to hexadecimal filename
+     * objdoc (decimal) → hexadecimal uppercase, padded to 8 chars
+     * Example: 10 → "0000000A", 3101 → "00000C1D"
      */
-    public function buildFilePath(string $filename, string $archiveBasePath = 'Archivdata'): string
+    public function objdocToHexFilename(string $objdoc): string
     {
-        // Extract first 6 characters from filename (without extension)
-        $baseName = pathinfo($filename, PATHINFO_FILENAME);
-        $first6 = substr($baseName, 0, 6);
+        $decimal = (int)$objdoc;
+        $hex = strtoupper(dechex($decimal));
+        return str_pad($hex, 8, '0', STR_PAD_LEFT);
+    }
 
-        // Build UP folder name
+    /**
+     * Build file path for ELO document file using objdoc
+     *
+     * Path format: Archivdata/DMS_1/UP{first6chars}/{hexFilename}.{ext}
+     * Example: objdoc=3101 → Archivdata/DMS_1/UP00000C/00000C1D.{TIF|JPG}
+     */
+    public function buildFilePathFromObjdoc(string $objdoc, string $archiveBasePath = 'Archivdata'): string
+    {
+        $hexFilename = $this->objdocToHexFilename($objdoc);
+
+        // Extract first 6 characters for UP folder
+        $first6 = substr($hexFilename, 0, 6);
         $upFolder = 'UP' . $first6;
 
-        // Build full path
-        return "{$archiveBasePath}/DMS_1/{$upFolder}/{$filename}";
+        // Build path without extension (caller will glob for extension)
+        return "{$archiveBasePath}/DMS_1/{$upFolder}/{$hexFilename}";
     }
 
     /**

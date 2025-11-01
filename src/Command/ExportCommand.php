@@ -110,42 +110,36 @@ class ExportCommand extends Command
 
             foreach ($documents as $document) {
                 try {
-                    // Get filename from ELO_FNAME (uppercase)
-                    $filename = $document['elo_fname'] ?? null;
+                    // Get objdoc (required)
+                    $objdoc = $document['objdoc'] ?? null;
 
-                    if (!$filename) {
-                        // Fallback to objdoc with extension guessing
-                        $objdoc = $document['objdoc'] ?? null;
-                        if ($objdoc) {
-                            $possibleExtensions = ['.TIF', '.JPG', '.JPEG'];
-                            foreach ($possibleExtensions as $ext) {
-                                $testFile = $objdoc . $ext;
-                                $testPath = $filesPath . '/' . $dbReader->buildFilePath($testFile, '');
-                                if (file_exists($testPath)) {
-                                    $filename = $testFile;
-                                    break;
-                                }
-                            }
-                        }
-
-                        if (!$filename) {
-                            $skipped++;
-                            $logger->debug('Skipped document without ELO_FNAME', ['objid' => $document['objid'] ?? 'unknown']);
-                            $io->progressAdvance();
-                            continue;
-                        }
+                    if (!$objdoc) {
+                        $skipped++;
+                        $logger->debug('Skipped document without objdoc', ['objid' => $document['objid'] ?? 'unknown']);
+                        $io->progressAdvance();
+                        continue;
                     }
 
-                    // Build source file path
-                    $sourcePath = $filesPath . '/' . $dbReader->buildFilePath($filename, '');
+                    // Build file path pattern without extension (objdoc as hex filename)
+                    $filePathPattern = $filesPath . '/' . $dbReader->buildFilePathFromObjdoc($objdoc, '');
 
-                    if (!file_exists($sourcePath)) {
-                        $error = sprintf('File not found: %s (objid: %s)', $sourcePath, $document['objid'] ?? 'unknown');
+                    // Glob for file with any extension
+                    $possibleFiles = glob($filePathPattern . '.*', GLOB_NOSORT);
+
+                    if (empty($possibleFiles)) {
+                        $error = sprintf('File not found for objdoc: %s (hex: %s, objid: %s)',
+                            $objdoc,
+                            $dbReader->objdocToHexFilename($objdoc),
+                            $document['objid'] ?? 'unknown'
+                        );
                         $errors[] = $error;
                         $logger->warning($error);
                         $io->progressAdvance();
                         continue;
                     }
+
+                    // Use first matching file
+                    $sourcePath = $possibleFiles[0];
 
                     // Check if it's an image format we can convert
                     if (!$imageConverter->isSupported($sourcePath)) {
