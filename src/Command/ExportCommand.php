@@ -7,7 +7,6 @@ namespace Four\Elo\Command;
 use Exception;
 use Four\Elo\Service\DatabaseReader;
 use Four\Elo\Service\ExportOrganizer;
-use Four\Elo\Service\ImageConverter;
 use Four\Elo\Service\Logger;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
@@ -88,7 +87,6 @@ class ExportCommand extends Command
             // Initialize services
             $io->section('Initializing services...');
             $dbReader = new DatabaseReader($databasePath);
-            $imageConverter = new ImageConverter();
             $organizer = new ExportOrganizer($outputPath);
             $logger->info('Services initialized successfully');
 
@@ -140,25 +138,15 @@ class ExportCommand extends Command
                     // Use first matching file
                     $sourcePath = $possibleFiles[0];
 
-                    // Check if it's an image format we can convert
-                    if (!$imageConverter->isSupported($sourcePath)) {
-                        $skipped++;
-                        $logger->debug('Skipped unsupported file format', ['file' => $sourcePath]);
-                        $io->progressAdvance();
-                        continue;
-                    }
-
-                    // Convert to PDF
-                    $logger->debug('Converting to PDF', ['source' => $sourcePath]);
-                    $pdfContent = $imageConverter->convertToPdf($sourcePath);
-
                     // Add to export with proper organization
-                    $pdfRelativePath =  $dbReader->createDocumentPath($document) . '.pdf';
-                    $targetPath = $organizer->addDocument($document, $pdfRelativePath, $pdfContent);
+                    $relativePath =  $dbReader->createDocumentPath($document);
+                    $targetPath = $organizer->addFile($sourcePath, $relativePath);
+
+                    // Log success
                     $logger->info('Processed document', [
                         'objid' => $document->objid ?? 'unknown',
-                        'source' => basename($sourcePath),
-                        'target' => basename($targetPath)
+                        'source' => $sourcePath,
+                        'target' => $targetPath
                     ]);
 
                     $processed++;

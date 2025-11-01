@@ -1,16 +1,16 @@
 # ELO DMS Export Tool
 
-A PHP CLI tool for exporting ELO DMS archives to Nextcloud-ready folder structures. Converts TIF/JPG images to PDF format and organizes documents with searchable metadata.
+A PHP CLI tool for exporting ELO DMS archives to Nextcloud-ready folder structures. Preserves the original ELO folder hierarchy and converts image files to PDF format.
 
 ## Features
 
-- Extract documents and metadata from ELO MDB databases
-- Convert TIF/JPG images to PDF using PHP Imagick
-- Organize documents by date in clean folder hierarchy
-- Export metadata to CSV for easy filtering
-- Generate JSON export reports
+- Extract documents from ELO MDB databases using mdb-json
+- Convert image files (TIF, TIFF, JPG, JPEG, PNG, GIF) to PDF using PHP Imagick
+- Preserve original ELO folder hierarchy structure
+- Copy unsupported file formats as-is
+- Support for multi-page TIFF to multi-page PDF conversion
 - Sanitize filenames for cross-platform compatibility
-- Support for multi-page TIFF documents
+- Direct PDF generation without temporary files
 
 ## Requirements
 
@@ -106,20 +106,27 @@ Basic export command:
 
 ## Output Structure
 
+The tool preserves the original ELO folder hierarchy:
+
 ```
 export-directory/
-├── documents/
+├── Invoices/
 │   ├── 2024/
-│   │   ├── 01/
-│   │   │   ├── invoice-2024-001.pdf
-│   │   │   └── contract-abc.pdf
-│   │   └── 02/
+│   │   ├── invoice-2024-001.pdf
+│   │   └── contract-abc.pdf
 │   └── 2025/
-├── metadata/
-│   ├── documents.csv          # All metadata in CSV format
-│   └── export-report.json     # Export statistics and details
-└── README.md                  # Export documentation
+│       └── invoice-2025-001.pdf
+├── Contracts/
+│   └── client-agreement.pdf
+└── HR Documents/
+    └── employee-handbook.pdf
 ```
+
+- Folder structure mirrors the original ELO folder hierarchy
+- Supported image formats (TIF, JPG, PNG, GIF) are converted to PDF
+- Unsupported file formats are copied as-is with original extension
+- Filenames are sanitized for cross-platform compatibility
+- Duplicate filenames are automatically numbered (file_1.pdf, file_2.pdf, etc.)
 
 ## ELO Database Schema
 
@@ -131,11 +138,11 @@ The tool works with standard ELO DMS database structure:
 
 ### Key Fields
 
-- Files are identified by `objtype > 254`
+- Files are identified by `objtype > 254` and `objtype < 9999` (excluding root object)
 - Deleted documents have `objstatus != 0` (excluded from export)
 - Folder hierarchy built from `objparent` references
-- File path format: `Archivdata/DMS_1/UP{objdoc>>10 in 6-char hex}/{objdoc in 8-char hex}`
-- Example: objdoc=3101 → `Archivdata/DMS_1/UP000003/00000C1D.TIF`
+- File path format: `Archivdata/DMS_1/UP{(objdoc>>10)<<2 in 6-char hex}/{objdoc in 8-char hex}`
+- Example: objdoc=3101 → folder=(3101>>10)<<2=12 → `Archivdata/DMS_1/UP00000C/00000C1D.TIF`
 
 ## Development
 

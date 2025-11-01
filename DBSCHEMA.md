@@ -24,16 +24,16 @@ This tool exports documents from an ELO DMS archive by:
    - Folder names are sanitized `objshort` values
 
 3. **Process file objects**
-   - Filter files (objtype > 254) where objstatus = 0 (active)
+   - Filter files (objtype > 254 and < 9999) where objstatus = 0 (active, excluding root)
    - For each file:
      - Convert `objdoc` (decimal) to hex filename (e.g., 3101 → "00000C1D")
-     - Calculate folder: `objdoc >> 10` (divide by 1024), convert to 6-char hex
+     - Calculate folder: `(objdoc >> 10) << 2` (divide by 256), convert to 6-char hex
      - Build file path: `Archivdata/DMS_1/UP{folder_hex}/{hexFilename}.*`
-     - Example: objdoc=3101 → folder=3>>10=3=000003 → `Archivdata/DMS_1/UP000003/00000C1D.*`
-     - Use glob to find file with any extension (.TIF, .JPG, etc.)
+     - Example: objdoc=3101 → folder=(3101>>10)<<2=12=00000C → `Archivdata/DMS_1/UP00000C/00000C1D.*`
+     - Use glob to find file with any extension
      - Get folder path using `objparent` from folder lookup
-     - Convert TIF/JPG to PDF
-     - Save as: `Export/<folder_path>/<sanitized_objshort>.pdf`
+     - Convert supported formats (TIF, JPG, PNG, GIF) to PDF or copy unsupported files as-is
+     - Save as: `Export/<folder_path>/<sanitized_objshort>.<ext>`
 
 ## Database Structure
 
@@ -91,24 +91,27 @@ Files are stored in a two-level directory structure based on objdoc calculation:
 
 **Folder Calculation**:
 - Take objdoc value (decimal)
-- Divide by 1024 using bitwise right shift: `objdoc >> 10`
+- Divide by 256 using: `(objdoc >> 10) << 2`
+  - Shift right 10 bits (divide by 1024)
+  - Shift left 2 bits (multiply by 4)
+  - Net effect: divide by 256
 - Convert result to 6-character uppercase hex
 - Prefix with "UP"
 
 **Example**:
 - objdoc: 3101 (decimal)
-- Folder calculation: 3101 >> 10 = 3
-- Folder hex: 000003 (6 chars)
-- Folder name: UP000003
+- Folder calculation: (3101 >> 10) << 2 = 3 << 2 = 12
+- Folder hex: 00000C (6 chars)
+- Folder name: UP00000C
 - Filename: 00000C1D.TIF (objdoc 3101 in 8-char hex)
-- Full path: `Archivdata/DMS_1/UP000003/00000C1D.TIF`
+- Full path: `Archivdata/DMS_1/UP00000C/00000C1D.TIF`
 
 **More Examples**:
-| objdoc | objdoc >> 10 | Folder Hex | Folder Name | Filename    |
-|--------|--------------|------------|-------------|-------------|
-| 3101   | 3            | 000003     | UP000003    | 00000C1D    |
-| 18000  | 17           | 000011     | UP000011    | 00004650    |
-| 115000 | 112          | 000070     | UP000070    | 0001C138    |
+| objdoc | (objdoc>>10)<<2 | Folder Hex | Folder Name | Filename    |
+|--------|-----------------|------------|-------------|-------------|
+| 3101   | 12              | 00000C     | UP00000C    | 00000C1D    |
+| 18000  | 68              | 000044     | UP000044    | 00004650    |
+| 115000 | 448             | 0001C0     | UP0001C0    | 0001C138    |
 
 ## Filename Sanitization Rules
 
@@ -141,10 +144,10 @@ Export/Invoices/2024/INV-001.pdf
 2. File objid=300 has objparent=200, objdoc="3101"
 3. Get folder path from objparent=200: "Invoices/2024"
 4. Convert objdoc to hex: 3101 (decimal) → "00000C1D" (hex, 8 chars)
-5. Calculate folder: 3101 >> 10 = 3 → "000003" (hex, 6 chars) → "UP000003"
-6. Build file path: `Archivdata/DMS_1/UP000003/00000C1D.*`
-7. Glob finds: `Archivdata/DMS_1/UP000003/00000C1D.TIF`
-8. Convert TIF → PDF
+5. Calculate folder: (3101 >> 10) << 2 = 12 → "00000C" (hex, 6 chars) → "UP00000C"
+6. Build file path: `Archivdata/DMS_1/UP00000C/00000C1D.*`
+7. Glob finds: `Archivdata/DMS_1/UP00000C/00000C1D.TIF`
+8. Convert TIF → PDF (or copy if unsupported format)
 9. Save as: "Export/Invoices/2024/INV-001.pdf"
 
 ## Filename Conversion

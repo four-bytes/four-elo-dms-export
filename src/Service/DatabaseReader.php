@@ -51,9 +51,9 @@ class DatabaseReader
                 if (!$record) {
                     continue;
                 }
-                // Extend properties
+                // Extend properties, objtype 9999 is root
                 $record->isFolder = $record->objtype < 255;
-                $record->isDocument = $record->objtype > 254;
+                $record->isDocument = $record->objtype > 254 && $record->objtype < 9999;
                 $record->isDeleted = ($record->objstatus ?? 0) != 0;
                 // Add object to collection
                 $objects[$record->objid] = $record;
@@ -192,7 +192,7 @@ class DatabaseReader
         }
 
         // Folder: shift right by 10 bits (divide by 1024), convert to 6-char hex
-        $folder = 'UP' . $this->objdocidToHexFilename($objdocid >> 10, 6);
+        $folder = 'UP' . $this->objdocidToHexFilename($objdocid >> 10 << 2, 6);
 
         // Hex file name (8 characters)
         $hexFilename = $this->objdocidToHexFilename($objdocid);

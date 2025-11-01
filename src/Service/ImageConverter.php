@@ -28,9 +28,10 @@ class ImageConverter
      * Convert image file to PDF
      *
      * @param string $sourcePath Path to image file (TIF, JPG, PNG)
-     * @return string Path to generated PDF file
+     * @param string $destinationPath Path to generated PDF file
+     * @return bool
      */
-    public function convertToPdf(string $sourcePath): string
+    public function convertToPdf(string $sourcePath, string $destinationPath): bool
     {
         if (!file_exists($sourcePath)) {
             throw new InvalidArgumentException("Source file not found: {$sourcePath}");
@@ -49,10 +50,10 @@ class ImageConverter
             $imagick->setImageCompressionQuality(85);
 
             // Write PDF file
-            $content = (string)$imagick;
+            $result = $imagick->writeImages($destinationPath, true);
             $imagick->clear();
 
-            return $content;
+            return $result;
 
         } catch (ImagickException $e) {
             throw new RuntimeException(
@@ -65,47 +66,13 @@ class ImageConverter
 
     /**
      * Check if file format is supported
-     * @param string $filePath
+     * @param string $extension
      * @return bool
      */
-    public function isSupported(string $filePath): bool
+    public function isSupportedFormat(string $extension): bool
     {
-        $extension = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
-        return in_array($extension, ['tif', 'tiff', 'jpg', 'jpeg', 'png', 'gif'], true);
-    }
-
-    /**
-     * Get image information
-     *
-     * @return array{width: int, height: int, pages: int, format: string}
-     */
-    public function getImageInfo(string $filePath): array
-    {
-        if (!file_exists($filePath)) {
-            throw new InvalidArgumentException("File not found: {$filePath}");
-        }
-
-        try {
-            $imagick = new Imagick($filePath);
-
-            $info = [
-                'width' => $imagick->getImageWidth(),
-                'height' => $imagick->getImageHeight(),
-                'pages' => $imagick->getNumberImages(),
-                'format' => $imagick->getImageFormat(),
-            ];
-
-            $imagick->clear();
-            $imagick->destroy();
-
-            return $info;
-
-        } catch (ImagickException $e) {
-            throw new RuntimeException(
-                "Failed to read image info: {$filePath}",
-                0,
-                $e
-            );
-        }
+        return in_array(
+            strtolower($extension),
+            ['tif', 'tiff', 'jpg', 'jpeg', 'png', 'gif'], true);
     }
 }

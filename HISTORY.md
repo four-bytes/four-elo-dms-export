@@ -1,5 +1,37 @@
 # four-elo-dms-export - Change History
 
+## [0.6.0] - 2025-11-01
+
+### Changed
+- **Folder calculation corrected**: Changed from `>> 10` to `>> 10 << 2` (equivalent to `>> 8`, divide by 256)
+- **Root object excluded**: Root object (objtype 9999) now properly excluded from documents
+- **Multi-page PDF support**: Use `writeImages()` instead of `writeImage()` for proper multi-page TIFF conversion
+- **Unified file handling**: New `addFile()` method handles both conversion and direct copy
+- **Direct PDF generation**: ImageConverter writes directly to destination, no temporary files
+- **Full path logging**: Log entries now include complete file paths instead of basenames for better traceability
+
+### Added
+- `isSupportedFormat()` in ImageConverter: Check if file format supports conversion (tif, tiff, jpg, jpeg, png, gif)
+- `addFile()` in ExportOrganizer: Unified method for adding files (auto-converts or copies based on format)
+- `generateUniqueFilename()` in ExportOrganizer: Handles duplicate filename resolution
+- Support for non-image files: Files with unsupported formats are copied as-is
+
+### Removed
+- Temporary PDF file handling (no longer needed)
+- Separate conversion and copy logic in ExportCommand (unified in ExportOrganizer)
+
+### Fixed
+- Multi-page TIFF files now correctly converted to multi-page PDFs
+- Folder path calculation for physical file locations (divide by 256 instead of 1024)
+- Root object (objtype 9999) no longer processed as document
+
+### Technical Details
+- Folder calculation: `(objdoc >> 10) << 2` = shift right 10, shift left 2 = net shift right 8 = divide by 256
+- ImageConverter uses `writeImages($path, true)` for multi-page support
+- ExportOrganizer checks format and either converts to PDF or copies original
+- Cleaner API: `addFile(sourcePath, relativePath)` handles everything
+- No temporary files in /tmp or project directories
+
 ## [0.5.0] - 2025-11-01
 
 ### Changed

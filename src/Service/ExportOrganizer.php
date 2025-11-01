@@ -34,30 +34,54 @@ class ExportOrganizer
     }
 
     /**
-     * Add document to export
-     * @param stdClass $document
-     * @param string $pdfRelativePath
-     * @param string $pdfContent
+     * Add file to export
+     * @param string $sourcePath
+     * @param string $relativePath
      * @return string
      */
-    public function addDocument(stdClass $document, string $pdfRelativePath, string $pdfContent): string
+    public function addFile(string $sourcePath, string $relativePath): string
     {
-        // Create target directory
-        $path = pathinfo($pdfRelativePath);
+        // Create the target directory
+        $path = pathinfo($relativePath);
         $targetDir = $this->outputPath . '/' . $path['dirname'] . '/';
         $this->filesystem->mkdir($targetDir);
 
-        // Generate unique filename if needed
-        $pdfPath = $targetDir . $path['filename'] . ".pdf";
-        $counter = 1;
-        while (file_exists($pdfPath)) {
-            $pdfPath = $targetDir . $path['filename'] . "_$counter.pdf";
-            $counter++;
+        // File parts
+        $fileName = $path['filename'];
+        $extension = strtolower(pathinfo($sourcePath, PATHINFO_EXTENSION));
+
+        // Check if conversion is supported
+        $imageConverter = new ImageConverter();
+        if ($imageConverter->isSupportedFormat($extension)) {
+            // Convert to PDF
+            $extension = 'pdf';
+            $targetPath = $this->generateUniqueFilename($targetDir, $fileName, $extension);
+            $imageConverter->convertToPdf($sourcePath, $targetPath);
+        } else {
+            // Copy file
+            $targetPath = $this->generateUniqueFilename($targetDir, $fileName, $extension);
+            $this->filesystem->copy($sourcePath, $targetPath);
         }
 
-        // Write PDF to target location
-        $this->filesystem->dumpFile($pdfPath, $pdfContent);
+        // Return real unique target path
+        return $targetPath;
+    }
 
-        return $pdfPath;
+    /**
+     * @param string $dir
+     * @param string $fileName
+     * @param string $extension
+     * @return string
+     */
+    public function generateUniqueFilename(string $dir, string $fileName, string $extension): string
+    {
+        $dir = rtrim($dir, '/');
+        $path = "$dir/$fileName.$extension";
+        $counter = 0;
+        while (file_exists($path)) {
+            $counter++;
+            $path = "$dir/{$fileName}_$counter.$extension";
+        }
+        return $path;
     }
 }
