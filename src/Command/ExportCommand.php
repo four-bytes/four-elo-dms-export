@@ -17,12 +17,11 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 
 class ExportCommand extends Command
 {
-    protected static $defaultName = 'export';
-    protected static $defaultDescription = 'Export ELO DMS archive to Nextcloud-ready folder structure';
-
     protected function configure(): void
     {
         $this
+            ->setName('export')
+            ->setDescription('Export ELO DMS archive to Nextcloud-ready folder structure')
             ->addArgument(
                 'database',
                 InputArgument::REQUIRED,
@@ -111,14 +110,30 @@ class ExportCommand extends Command
 
             foreach ($documents as $document) {
                 try {
-                    // Get filename (from elo_fname or use objdoc)
-                    $filename = $document['elo_fname'] ?? $document['objdoc'] ?? null;
+                    // Get filename from ELO_FNAME (uppercase)
+                    $filename = $document['elo_fname'] ?? null;
 
                     if (!$filename) {
-                        $skipped++;
-                        $logger->debug('Skipped document without filename', ['objid' => $document['objid'] ?? 'unknown']);
-                        $io->progressAdvance();
-                        continue;
+                        // Fallback to objdoc with extension guessing
+                        $objdoc = $document['objdoc'] ?? null;
+                        if ($objdoc) {
+                            $possibleExtensions = ['.TIF', '.JPG', '.JPEG'];
+                            foreach ($possibleExtensions as $ext) {
+                                $testFile = $objdoc . $ext;
+                                $testPath = $filesPath . '/' . $dbReader->buildFilePath($testFile, '');
+                                if (file_exists($testPath)) {
+                                    $filename = $testFile;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (!$filename) {
+                            $skipped++;
+                            $logger->debug('Skipped document without ELO_FNAME', ['objid' => $document['objid'] ?? 'unknown']);
+                            $io->progressAdvance();
+                            continue;
+                        }
                     }
 
                     // Build source file path

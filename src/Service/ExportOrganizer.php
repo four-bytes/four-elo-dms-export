@@ -45,16 +45,11 @@ class ExportOrganizer
         $filename = $this->sanitizeFilename($metadata['objshort'] ?? 'document');
         $filename .= '.pdf';
 
-        // Organize by date if available
+        // Use folder path from ELO hierarchy
         $targetDir = $this->outputPath . '/documents';
 
-        if (!empty($metadata['objidate'])) {
-            $date = $this->parseEloDate($metadata['objidate']);
-            if ($date) {
-                $year = $date->format('Y');
-                $month = $date->format('m');
-                $targetDir .= "/{$year}/{$month}";
-            }
+        if (!empty($metadata['folder_path'])) {
+            $targetDir .= '/' . $metadata['folder_path'];
         }
 
         // Create target directory
