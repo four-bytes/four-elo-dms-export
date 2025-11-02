@@ -135,8 +135,12 @@ class ExportCommand extends Command
             foreach ($documents as $document) {
                 try {
                     // Check if already exported (auto-resume)
-                    if ($organizer->isExported($document->objid)) {
+                    if ($organizer->isExported($document->objid) || $idsOption) {
                         $skipped++;
+                        $logger->debug('Skipped already exported document without objdoc', [
+                            'objid' => $document->objid ?? 'unknown',
+                            'objshort' => $document->objshort ?? 'unknown'
+                        ]);
                         $io->progressAdvance();
                         continue;
                     }
@@ -153,10 +157,10 @@ class ExportCommand extends Command
                     }
 
                     // Build paths early for logging
+                    $sourceBaseFile = $dbReader->buildFilePath($document, $filesPath);
                     $relativePath =  $dbReader->createDocumentPath($document);
 
                     // Build file path pattern without extension (objdoc as hex filename)
-                    $sourceBaseFile = $dbReader->buildFilePath($document, $filesPath);
                     $filePathPattern =  "$sourceBaseFile.*";
 
                     // Glob for file with any extension

@@ -52,8 +52,8 @@ class DatabaseReader
                     continue;
                 }
                 // Extend properties, objtype 9999 is root
-                $record->isFolder = $record->objtype < 255;
-                $record->isDocument = $record->objtype > 254 && $record->objtype < 9999;
+                $record->isFolder = $record->objtype < 254;
+                $record->isDocument = $record->objtype >= 254 && $record->objtype < 9999;
                 $record->isDeleted = ($record->objstatus ?? 0) != 0;
                 // Add object to collection
                 $objects[$record->objid] = $record;
@@ -134,7 +134,7 @@ class DatabaseReader
         $folders = $this->getFolders();
         $folder = $folders[$folderId] ?? null;
         $path = "";
-        while ($folder && $folder->objparent > 1) {
+        while ($folder) {
             $path = $this->sanitizeFileName($folder->objshort) . "/" . $path;
             $folder = $folders[$folder->objparent] ?? null;
         }

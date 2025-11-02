@@ -98,7 +98,7 @@ class ExportOrganizer
         $this->filesystem->mkdir($targetDir);
 
         // File parts
-        $fileName = $path['filename'];
+        $fileName = $path['basename']; // include possible dots, relativePath has no extension
         $extension = strtolower(pathinfo($sourcePath, PATHINFO_EXTENSION));
 
         // Check if conversion is supported
