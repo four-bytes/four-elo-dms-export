@@ -14,6 +14,8 @@ class ExportOrganizer
 {
     private Filesystem $filesystem;
     private string $outputPath;
+    private ?array $exportedIds = null;
+    private string $exportedIdsFile;
 
     /**
      * @param string $outputPath
@@ -22,6 +24,7 @@ class ExportOrganizer
     {
         $this->filesystem = new Filesystem();
         $this->outputPath = rtrim($outputPath, '/');
+        $this->exportedIdsFile = $this->outputPath . '/exported_ids.txt';
     }
 
     /**
@@ -31,6 +34,54 @@ class ExportOrganizer
     {
         // Create output directory
         $this->filesystem->mkdir($this->outputPath);
+    }
+
+    /**
+     * Get exported IDs (lazy load from file on first access)
+     * @return string[]
+     */
+    private function getExportedIds(): array
+    {
+        if ($this->exportedIds === null) {
+            if (file_exists($this->exportedIdsFile)) {
+                $this->exportedIds = file($this->exportedIdsFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+            } else {
+                $this->exportedIds = [];
+            }
+        }
+        return $this->exportedIds;
+    }
+
+    /**
+     * Check if an object ID has already been exported
+     * @param int $objid
+     * @return bool
+     */
+    public function isExported(int $objid): bool
+    {
+        return in_array((string)$objid, $this->getExportedIds(), true);
+    }
+
+    /**
+     * Mark an object ID as exported
+     * @param int $objid
+     */
+    public function markExported(int $objid): void
+    {
+        if (!$this->isExported($objid)) {
+            $this->exportedIds[] = (string)$objid;
+            // Append immediately to file for crash recovery (fast!)
+            file_put_contents($this->exportedIdsFile, "$objid\n", FILE_APPEND);
+        }
+    }
+
+    /**
+     * Get count of already exported IDs
+     * @return int
+     */
+    public function getExportedCount(): int
+    {
+        return count($this->getExportedIds());
     }
 
     /**

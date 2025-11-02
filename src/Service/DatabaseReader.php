@@ -87,6 +87,16 @@ class DatabaseReader
     }
 
     /**
+     * Get documents by specific object IDs
+     * @param int[] $ids
+     * @return stdClass[]
+     */
+    public function getDocumentsById(array $ids): array
+    {
+        return array_filter($this->getDocuments(), fn($obj) => in_array($obj->objid, $ids, true));
+    }
+
+    /**
      * @return stdClass[]
      */
     public function getFolders(): array

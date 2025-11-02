@@ -38,6 +38,12 @@ class ExportCommand extends Command
                 InputOption::VALUE_REQUIRED,
                 'Output directory for export',
                 './nextcloud-export'
+            )
+            ->addOption(
+                'ids',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'Comma-separated list of object IDs to export (useful for re-exporting specific documents)'
             );
     }
 
@@ -92,27 +98,56 @@ class ExportCommand extends Command
 
             // Read database (get count first for progress bar)
             $io->section('Reading ELO database...');
-            $documentCount = $dbReader->getDocumentCount();
-            $io->success(sprintf('Found %d documents in database', $documentCount));
-            $logger->info('Found ' . $documentCount . ' documents in database');
+
+            // Check if specific IDs are requested
+            $idsOption = $input->getOption('ids');
+            if ($idsOption) {
+                // Parse comma-separated IDs
+                $ids = array_map('intval', array_filter(array_map('trim', explode(',', $idsOption))));
+                $documents = $dbReader->getDocumentsById($ids);
+                $documentCount = count($documents);
+                $io->success(sprintf('Found %d documents matching IDs: %s', $documentCount, implode(', ', $ids)));
+                $logger->info('Exporting ' . $documentCount . ' documents by IDs: ' . implode(', ', $ids));
+            } else {
+                $documentCount = $dbReader->getDocumentCount();
+                $documents = $dbReader->getDocuments();
+                $io->success(sprintf('Found %d documents in database', $documentCount));
+                $logger->info('Found ' . $documentCount . ' documents in database');
+            }
 
             // Initialize output directory
             $organizer->initialize();
 
-            // Process documents (streaming)
+            // Check for already exported IDs (auto-loads on first access)
+            $alreadyExported = $organizer->getExportedCount();
+            if ($alreadyExported > 0) {
+                $io->note(sprintf('Found %d already exported documents (will skip)', $alreadyExported));
+                $logger->info('Found ' . $alreadyExported . ' already exported documents');
+            }
+
+            // Process documents
             $io->section('Processing documents...');
             $io->progressStart($documentCount);
-            $documents = $dbReader->getDocuments();
 
             $processed = 0;
             $skipped = 0;
             $errors = [];
             foreach ($documents as $document) {
                 try {
+                    // Check if already exported (auto-resume)
+                    if ($organizer->isExported($document->objid)) {
+                        $skipped++;
+                        $io->progressAdvance();
+                        continue;
+                    }
+
                     // Get objdoc (required)
                     if (!($document->objdoc ?? null)) {
                         $skipped++;
-                        $logger->debug('Skipped document without objdoc', ['objid' => $document->objid ?? 'unknown']);
+                        $logger->debug('Skipped document without objdoc', [
+                            'objid' => $document->objid ?? 'unknown',
+                            'objshort' => $document->objshort ?? 'unknown'
+                        ]);
                         $io->progressAdvance();
                         continue;
                     }
@@ -142,6 +177,9 @@ class ExportCommand extends Command
                     $relativePath =  $dbReader->createDocumentPath($document);
                     $targetPath = $organizer->addFile($sourcePath, $relativePath);
 
+                    // Mark as exported (auto-saves to exported_ids.json)
+                    $organizer->markExported($document->objid);
+
                     // Log success
                     $logger->info('Processed document', [
                         'objid' => $document->objid ?? 'unknown',
@@ -158,7 +196,11 @@ class ExportCommand extends Command
                         $e->getMessage()
                     );
                     $errors[] = $error;
-                    $logger->error($error);
+                    $logger->error($error, [
+                        'source' => $sourcePath ?? '',
+                        'target' => $targetPath ?? '',
+                        'exception' => $e
+                    ]);
                 }
 
                 $io->progressAdvance();
@@ -171,7 +213,7 @@ class ExportCommand extends Command
             $io->success(sprintf('Successfully processed %d documents', $processed));
 
             if ($skipped > 0) {
-                $io->info(sprintf('Skipped %d documents (not supported or no filename)', $skipped));
+                $io->info(sprintf('Skipped %d documents', $skipped));
             }
 
             if (!empty($errors)) {
@@ -188,6 +230,7 @@ class ExportCommand extends Command
             $logger->info("Skipped: {$skipped}");
             $logger->info("Errors: " . count($errors));
             $logger->info("Log file: " . $logger->getLogFile());
+
 
             $io->success("Export completed! Output: $outputPath");
             $io->info("Log file: " . $logger->getLogFile());

@@ -1,5 +1,45 @@
 # four-elo-dms-export - Change History
 
+## [0.7.0] - 2025-11-02
+
+### Added
+- `--ids` option: Export specific documents by comma-separated object IDs
+- `getDocumentsById()` in DatabaseReader: Filter documents by array of object IDs
+- **Auto-resume capability**: Tracks exported IDs in `exported_ids.json` and automatically skips already-exported documents
+- `loadExportedIds()` in ExportOrganizer: Load previously exported IDs
+- `isExported()` in ExportOrganizer: Check if document already exported
+- `markExported()` in ExportOrganizer: Mark document as exported (saves immediately)
+- `getExportedCount()` in ExportOrganizer: Get count of already exported documents
+
+### Changed
+- Export progress is now automatically saved after each document
+- Re-running export on same output directory automatically resumes from where it left off
+- Documents that failed previously can be retried by running export again
+
+### Use Cases
+- Re-export documents that had conversion errors
+- Export specific documents for testing
+- Selective re-processing without full database scan
+- Resume interrupted exports without starting over
+- Safe to Ctrl+C and restart - no duplicate work
+
+### Technical Details
+- `exported_ids.txt` stored in output directory root (one ID per line)
+- File uses append mode (`FILE_APPEND`) for optimal performance - no JSON encoding/decoding overhead
+- Already-exported documents are silently skipped (counted in "skipped")
+- Works with both full export and `--ids` selective export
+- Lazy loading: IDs loaded from file only on first access
+- Fast writes: Single append operation instead of reading, parsing, modifying, encoding, and writing entire file
+
+### Example
+```bash
+# Export specific documents
+./bin/elo-export export /path/to/DMS.MDB /path/to/Archivdata --output=/path/to/export --ids=100,200,300
+
+# Resume after interruption (auto-skips already exported)
+./bin/elo-export export /path/to/DMS.MDB /path/to/Archivdata --output=/path/to/export
+```
+
 ## [0.6.0] - 2025-11-01
 
 ### Changed
