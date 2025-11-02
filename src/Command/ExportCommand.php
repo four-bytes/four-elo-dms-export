@@ -152,8 +152,12 @@ class ExportCommand extends Command
                         continue;
                     }
 
+                    // Build paths early for logging
+                    $relativePath =  $dbReader->createDocumentPath($document);
+
                     // Build file path pattern without extension (objdoc as hex filename)
-                    $filePathPattern = $dbReader->buildFilePath($document, $filesPath) . '.*';
+                    $sourceBaseFile = $dbReader->buildFilePath($document, $filesPath);
+                    $filePathPattern =  "$sourceBaseFile.*";
 
                     // Glob for file with any extension
                     $possibleFiles = glob($filePathPattern, GLOB_NOSORT);
@@ -174,7 +178,6 @@ class ExportCommand extends Command
                     $sourcePath = $possibleFiles[0];
 
                     // Add to export with proper organization
-                    $relativePath =  $dbReader->createDocumentPath($document);
                     $targetPath = $organizer->addFile($sourcePath, $relativePath);
 
                     // Mark as exported (auto-saves to exported_ids.json)
@@ -184,7 +187,7 @@ class ExportCommand extends Command
                     $logger->info('Processed document', [
                         'objid' => $document->objid ?? 'unknown',
                         'source' => $sourcePath,
-                        'target' => $targetPath
+                        'target' => $relativePath,
                     ]);
 
                     $processed++;
@@ -197,8 +200,8 @@ class ExportCommand extends Command
                     );
                     $errors[] = $error;
                     $logger->error($error, [
-                        'source' => $sourcePath ?? '',
-                        'target' => $targetPath ?? '',
+                        'source' => $sourceBaseFile ?? '',
+                        'target' => $relativePath ?? '',
                         'exception' => $e
                     ]);
                 }
