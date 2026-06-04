@@ -1,4 +1,4 @@
-# four-elo-dms-export - CLAUDE.md
+# four-elo-dms-export - AGENTS.md
 
 ## Project Overview
 

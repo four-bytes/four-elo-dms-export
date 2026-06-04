@@ -189,7 +189,7 @@
 - Support for PHP Imagick-based image to PDF conversion
 - PDO ODBC integration for ELO MDB database access
 - Comprehensive logging system
-- Project documentation (CLAUDE.md, HISTORY.md, DBSCHEMA.md)
+- Project documentation (AGENTS.md, HISTORY.md, DBSCHEMA.md)
 
 ### Technical Details
 - **Package**: four-bytes/four-elo-dms-export
