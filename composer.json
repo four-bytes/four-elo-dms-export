@@ -1,6 +1,15 @@
 {
     "name": "four-bytes/four-elo-dms-export",
     "description": "CLI tool for exporting ELO DMS archives to Nextcloud-ready folder structures",
+    "keywords": [
+        "elo",
+        "dms",
+        "export",
+        "archive",
+        "nextcloud",
+        "cli",
+        "php"
+    ],
     "type": "library",
     "license": "MIT",
     "version": "0.7.0",
